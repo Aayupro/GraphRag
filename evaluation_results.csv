@@ -1,0 +1,4 @@
+question_id,query,vector_total_latency,graph_total_latency,vector_retrieval_latency,graph_retrieval_latency,vector_context_len,graph_context_len,vector_answer_len,graph_answer_len
+1,Who founded NexusCorp and what year was it?,1.1958410739898682,0.3340892791748047,0.0009160041809082031,9.489059448242188e-05,586,226,134,134
+2,What company did Dr. Elena Vance work for before founding NexusCorp?,1.5874788761138916,0.2914621829986572,0.0013191699981689453,0.001210927963256836,586,317,134,134
+3,Explain the connection between Symbiotic Inference and Matrix Foundry.,1.013383150100708,0.2858879566192627,0.0014498233795166016,0.00014495849609375,586,474,134,134

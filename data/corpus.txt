@@ -1,0 +1,5 @@
+Project Orion is a next-generation AI initiative developed by NexusCorp. NexusCorp was founded by Dr. Elena Vance in 2018. Dr. Elena Vance previously worked as the Chief Scientist at Aether Technologies. 
+
+Project Orion utilizes a specialized hardware cluster known as the Quantum Mesh. The Quantum Mesh is manufactured by Matrix Foundry. Matrix Foundry is located in Austin, Texas.
+
+Aether Technologies developed the core algorithm behind Project Orion, known as Symbiotic Inference. Symbiotic Inference requires high-bandwidth memory architectures provided exclusively by Matrix Foundry.
