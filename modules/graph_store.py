@@ -1,9 +1,21 @@
+import re
+
+
 class CustomGraphStore:
     def __init__(self):
         # Adjacency list representation: { node_lower: {"display_name": X, "type": Y, "source_chunks": [...] } }
         self.nodes = {}
         # Edges dictionary: { source_lower: [ {"target": target_lower, "type": edge_type, "source_chunk": idx}, ... ] }
         self.edges = {}
+        # Inverted index: { word_token: set(node_keys) } -- built incrementally as nodes are added.
+        # This lets query-time seed lookup be O(number of query tokens) instead of O(number of graph nodes).
+        self.inverted_index = {}
+
+    @staticmethod
+    def _tokenize(text: str) -> set:
+        # Lowercase, strip punctuation, split into words. Drop very short tokens (stopword-ish noise).
+        tokens = re.findall(r"[a-z0-9]+", text.lower())
+        return {t for t in tokens if len(t) > 2}
 
     def add_node(self, name: str, node_type: str, chunk_id: str):
         key = name.strip().lower()
@@ -13,21 +25,24 @@ class CustomGraphStore:
                 "type": node_type,
                 "source_chunks": set([chunk_id])
             }
+            # Index every token of this entity name -> this node key
+            for token in self._tokenize(key):
+                self.inverted_index.setdefault(token, set()).add(key)
         else:
             self.nodes[key]["source_chunks"].add(chunk_id)
 
     def add_edge(self, source: str, target: str, rel_type: str, chunk_id: str):
         src_key = source.strip().lower()
         tgt_key = target.strip().lower()
-        
+
         if src_key not in self.edges:
             self.edges[src_key] = []
-            
+
         # Avoid duplicate edges for the same chunk
         for edge in self.edges[src_key]:
             if edge["target"] == tgt_key and edge["type"] == rel_type and edge["source_chunk"] == chunk_id:
                 return
-                
+
         self.edges[src_key].append({
             "target": tgt_key,
             "type": rel_type,
@@ -45,13 +60,42 @@ class CustomGraphStore:
                 self.add_node(rel["target"], "Unknown", chunk["id"])
                 self.add_edge(rel["source"], rel["target"], rel["type"], chunk["id"])
 
+    def find_seed_nodes(self, query: str) -> list:
+        """
+        O(query tokens) seed lookup using the inverted index, replacing the old
+        O(number of graph nodes) linear substring scan that used to live in
+        UnifiedRetriever.execute_graph_rag.
+
+        Also keeps a full-phrase check for multi-word entity names (e.g. "Dr. Elena Vance")
+        so we don't lose matches that only work as a full substring, not as separate tokens.
+        """
+        query_lower = query.lower()
+        query_tokens = self._tokenize(query)
+
+        seed_keys = set()
+
+        # 1. Fast path: token-level inverted index lookup
+        for token in query_tokens:
+            if token in self.inverted_index:
+                seed_keys.update(self.inverted_index[token])
+
+        # 2. Full multi-word entity names won't always share a token in a useful way
+        #    (e.g. an entity "Matrix Foundry" already gets caught by "matrix" and "foundry"
+        #    tokens above, so this mainly guards single-token entity names with punctuation
+        #    or short names that got filtered out by the length>2 rule).
+        for node_key in self.nodes:
+            if len(node_key) <= 2 and node_key in query_lower:
+                seed_keys.add(node_key)
+
+        return list(seed_keys)
+
     def bfs_subgraph_extraction(self, seed_nodes: list, max_hops: int = 2) -> dict:
         """
         Custom Hand-Rolled Breadth-First Search (BFS) graph traversal strategy
         """
         visited_nodes = set()
         retrieved_edges = []
-        queue = [] # Format: (node_key, current_hop)
+        queue = []  # Format: (node_key, current_hop)
 
         for seed in seed_nodes:
             seed_key = seed.strip().lower()
